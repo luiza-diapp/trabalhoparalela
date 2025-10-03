@@ -1,0 +1,151 @@
+Trabalho 1: CI1316 2sem25 UFPR
+
+Versão dessa Especificação: v1.2
+
+Idéia: Algoritmo de soma de prefixos com pthreads
+-------------------------------------------------
+
+Idéia geral:
+Uma idéia "inicial/basica" para algoritmo ParallelPrefixSumPth,
+cada thread pode fazer operaçoes de escrita em memória na 
+sua "faixa" de números. 
+No entanto, nesse trabalho DEVEMOS fazer uma verão mais otimizada que:
+ 
+a) opera em duas fases separadas por APENAS UMA BARREIRA
+b) na fase ANTES da barreira:
+   -  cada thread APENAS LÊ todos os 
+      elementos da sua faixa produzindo sua partialSum de elementos.
+      (O vetor global partialSum, tem uma célula por thread,
+      cada célula irá produzir sua soma parcial ANTES da barreira)
+
+c) APÓS BARREIRA:
+   - Como o vetor de somasParciais só possui uma célula por thread
+     fica fácil (e muito rápido, pois são poucas posições) cada thread
+     fazer um "for" no vetor calculando o valor do seu prefixo na
+     sua variável local myPrefixSum.
+     Assim as threads NÃO precisam esperar a thread 0 calcular isso,
+     isso tamém evita a necessidade de uma barreira adicional,
+     pois não esperamos mais a thread 0 calcular myPrefixSum.
+   - Cada thread, após calcular seu valor myPrefixSum deve, então,
+     uma um "for" apenas, calcular e escrever corretamente os valores
+     na sua faixa, produzindo a soma de prefixos na sequencia final
+     correta (ou seja em uma passada de escritas na faixa) 
+
+OBS: poderiamos usar apenas um vetor de entrada e saida (do algoritmo),
+     ou seja, seria uma implementação "in place", ou seja,
+     estaríamos alterando o vetor de entrada. 
+     
+     Essa SERÁ a especificação do trabalho 1.
+     
+     Nesse trabalho 1 devemos ter:
+     - um vetor de entrada chamado InputVector (de long ints).
+     - um vetor de saída é o próprio InputVector (de long ints).
+     
+Especificamente para esse trabalho 1, devemos produzir uma funçao
+para esse algoritmo paralelo chamado ParallelPrefixSumPth.
+DEVEMOS, então, DEFINIR e usar a funçao ParallelPrefixSumPth abaixo, 
+que faz tudo, e seja ENCAPSULADA implementando com thread pool:
+  - cria as threads necessárias, e inicializa qualquel estrutura necessária
+    (e.g. barreiras, criar pool de threads, etc)
+  - O número de threads deve ser recebido como parâmetro
+  - fazer o algoritmo paralelo descrito com APENAS uma barreira
+    (se usar mais vai fica pior, e perder pontos)
+
+O prototipo dessa função deve ser:
+
+#define TYPE long long        // tipo dos dados dos vetores DEVE ser long long
+
+void ParallelPrefixSumPth( TYPE *Vec,           // vetor de ENTRADA E SAIDA 
+                           long nTotalElmts,
+                           int nThreads );
+
+OBS1: para ESSE trabalho 
+     vamos alocar o vetor de entrada via malloc,
+     permitindo alocar grandes vetores.
+OBS2: note que, acima NÂO existe um vetor de saída
+      OU SEJA, para esse trabalho faremos a soma de prefixos
+      "inplace". Portanto o vetor de entrada,
+      vai ser alterado pelo seu algoritmo para conter
+      a soma de prefixos do vetor inicial. 
+      Assim, o vetor Vec será de entrada e saída.
+     
+--------------------------------
+Exemplo para vetor de 8 números e fazendo com 3 threads:
+ATENÇÂO: para facilitar a explicação, vamos dar esse
+         exemplo com 2 vetores separados, um de entrada
+         e outro de saida, além de um pequeno vetor auxiliar,
+         MAS para o trabalho 1, 
+         somente haverá:
+            UM vetor Vec (que será de entrada e saída,
+            e você NAO deve usar vetores auxiliares,
+            A NAO SER o vetor PartialSum)    // (**) mudado aqui na v1.2      
+
+Exemplo de vetor InputVector (de entrada):
+vetor InputVector: [3  1  7  .   0    4     1  .   6    3]
+
+Cada thread faz a soma de valores na sua faixa de números (chunk),
+produzindo um valor na sua posição do vetor global partialSum
+Ou seja, para esse exemplo fica:
+A thread 0 faz:
+  - calcula myPartialSum = 3+1+7  
+  - armazena no vetor global assim: PartialSum[0] = myPartialSum;
+A thread 1 faz:
+  - calcula myPartialSum = 0+4+1 
+  - armazena no vetor global assim: PartialSum[1] = myPartialSum;
+A thread 2 faz:
+  - calcula myPartialSum = 6+3
+  - armazena no vetor global assim: PartialSum[2] = myPartialSum;
+O vetor global PartialSum fica:
+PartialSum: [ 11  5  9 ]  
+  
+Após a barreira cada thread faz:
+a) calcula a soma do seu prefixo lendo o vetor global PartialSum
+   e calculando seu "prefixo" na variável local myPrefixSum
+b) produz a soma de prefixos correta na usa faixa,
+   lendo lendo a faixa do vetor de entrada e escrevendo no vetor
+   de saída, e usando o seu valor calculado na soma myPrefixSum
+   
+vetor InputVector: [3  1  7  .   0    4     1  .   6    3]
+Assim temos:
+A thread 0 faz: 
+  a) myPrefixSum = 0   (sempre!)
+  b) produz sua faixa no vetor de saída com APENAS UM "for"
+     sua faixa fica [ 3 4 11 ... ]
+A thread 1 faz: 
+  a) myPrefixSum = 11   
+  b) produz sua faixa no vetor de saída com APENAS UM "for"
+     sua faixa fica [ ... 11 15 16 ... ]
+A thread 2 faz: 
+  a) myPrefixSum = 16   (porque? somou 11+5 do vetor PartialSum)   
+  b) produz sua faixa no vetor de saída com APENAS UM "for"
+     sua faixa fica [ ... 22 25 ]
+
+Nesse caso obtemos o seguinte vetor de saída 
+OutputVector: [3  4  11 .  11  15  16  . 22  25]
+
+
+---------------------------------
+Ou seja, vamos conferir:
+InputVector:  [3  1   7  .   0   4   1  .  6   3]
+OutputVector: [3  4  11  .  11  15  16  . 22  25]
+
+Ou seja, FUNCIONA!
+
+PERGUNTA:
+Consegue pensar em alguma otimização para esse algoritmo?
+
+PERGUNTA2:
+Consegue fazer esse algoritmo *inplace* ? 
+(ou seja, o vetor de saída é o próprio vetor de entrada, 
+ e APENAS usando o vetor partialSum, sem OUTRAS estruturas auxiliares,
+ tudo DEVE ser feito no próprio vetor Vec)
+ 
+Vec:  [3  1   7  .   0   4   1  .  6   3]
+usar o vetor partialSum e
+após soma-de-prefixos deve ficar assim:
+Vec:  [3  4  11  .  11  15  16  . 22  25]
+
+
+
+----------------------------------
+
