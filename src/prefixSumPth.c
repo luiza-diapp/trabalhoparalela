@@ -6,13 +6,12 @@
 
 	///////////////////////////////////////
 	///// ATENCAO: NAO MUDAR O MAIN   /////
-        ///////////////////////////////////////
+    ///////////////////////////////////////
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-
 
 #include "chrono.c"
 
@@ -66,21 +65,21 @@ int nTotalElements;  // numero total de elementos
 //   this will be allocated by malloc
 volatile TYPE *Vector;	// will use malloc e free to allow large (>2GB) vectors
 
-
 chronometer_t parallelPrefixSumTime;
 chronometer_t memcpyTime;
 
 volatile TYPE partialSum[MAX_THREADS];
-   
 
-// ======= Código do aluno (Lab 1 v1.3) — Thread Pool + 3 barreiras =======
+//Garantir que o código dentro desse bloco só seja compilado uma vez
 #ifndef _PS_HELPERS_DEFINED_
 #define _PS_HELPERS_DEFINED_
 
+// Thread Pool + 3 barreiras 
 static pthread_barrier_t ps_poolBarrier;   // B1: pool (alinhamento de início)
 static pthread_barrier_t ps_algoBarrier;   // B2: entre Fase 1 (partialSum) e Fase 2
 static pthread_barrier_t ps_doneBarrier;   // B3: término (garante que todas concluíram)
 
+// Estado global do pool
 static int  ps_nThreads = 0;
 static long ps_nTotal   = 0;
 static int  ps_tid[MAX_THREADS];
@@ -88,15 +87,16 @@ static pthread_t ps_threads[MAX_THREADS];
 
 // Divisão de trabalho balanceada [0,N) em P faixas
 static inline void ps_compute_chunk(long N, int P, int tid, long *L, long *R){
-    long base = N / P;
-    long rem  = N % P;
-    long start = tid * base + (tid < rem ? tid : rem);
-    long len   = base + (tid < rem ? 1 : 0);
+    long base = N / P; //calcula o tamanho base de cada pedaço
+    long rem  = N % P; //calcula o resto da divisão
+    long start = tid * base + (tid < rem ? tid : rem); //calcula onde começa o trecho da thread no vetor (adiciona 1 elemento extra para as primeiras rem threads)
+    long len   = base + (tid < rem ? 1 : 0); //tamanho do pedaço da thread, as primeiras rm threads pegam base +1 elementos
     *L = start; *R = start + len;
 }
 
-// Worker do pool: usa o Vector global e partialSum do template
+// Worker do pool: usa o Vector global e partialSum
 static void *ps_worker(void *arg){
+    //Pega o número da thread (seu ID lógico) que foi passado como ponteiro no pthread_create.
     int my = *((int*)arg);
 
     // B1 — começar juntos
@@ -128,7 +128,7 @@ static void *ps_worker(void *arg){
     return NULL;
 }
 #endif
-// ======= Fim do código auxiliar do aluno =================================
+
 int min(int a, int b)
 {
 	if (a < b)
@@ -178,9 +178,7 @@ void sequentialPrefixSum( volatile TYPE *Vec,
 
 void ParallelPrefixSumPth( volatile TYPE *Vec, 
                            long nTotalElmts,
-                           int nThreads )
-{
-   // (variáveis do template podem ser removidas se não forem usadas)
+                           int nThreads ){
    // pthread_t Thread[MAX_THREADS];
    // int my_thread_id[MAX_THREADS];
 
@@ -190,14 +188,17 @@ void ParallelPrefixSumPth( volatile TYPE *Vec,
    ps_nThreads = nThreads;
    ps_nTotal   = nTotalElmts;
 
-   pthread_barrier_init(&ps_poolBarrier, NULL, (unsigned)ps_nThreads);
-   pthread_barrier_init(&ps_algoBarrier, NULL, (unsigned)ps_nThreads);
-   pthread_barrier_init(&ps_doneBarrier, NULL, (unsigned)ps_nThreads);
+   //Cria barreitas que serão utilizadas no código para sincronia de threads
+   pthread_barrier_init(&ps_poolBarrier, NULL, (unsigned)ps_nThreads); //Cria barreita de início já que as threads são detached
+   pthread_barrier_init(&ps_algoBarrier, NULL, (unsigned)ps_nThreads); //Barreira depois de todas as threads fazer a soma de todos os elementos de cada uma
+   pthread_barrier_init(&ps_doneBarrier, NULL, (unsigned)ps_nThreads); //Verifica que todas as barreiras terminaram 
 
-   pthread_attr_t attr;
-   pthread_attr_init(&attr);
-   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+   //Barreira de atributos
+   pthread_attr_t attr; // Declara a variável de atributos
+   pthread_attr_init(&attr); //Inicializa com valores padrão.
+   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //Ajusta configurações específicas para não utilizar join.
 
+   //Inicia todas as threads detached 
    for(int t=1; t<ps_nThreads; ++t){
        ps_tid[t] = t;
        if(pthread_create(&ps_threads[t], &attr, ps_worker, &ps_tid[t]) != 0){
@@ -205,11 +206,16 @@ void ParallelPrefixSumPth( volatile TYPE *Vec,
            exit(1);
        }
    }
+   //Destrói variável de atributos 
    pthread_attr_destroy(&attr);
 
-   ps_tid[0] = 0;
-   (void)ps_worker(&ps_tid[0]);
+   //as threads 1, 2, 3... são criadas com pthread_create; a thread principal (main) é usada como thread 0, sem precisar criar mais uma.
+   //todas as threads: executam a mesma função (ps_worker); trabalham ao mesmo tempo; 
+   //são sincronizadas com barreiras (começam e terminam juntas) -> isso define uma pool thread
+   ps_tid[0] = 0; 
+   (void)ps_worker(&ps_tid[0]); 
 
+   //Destrói barreiras criadas anteriormente
    pthread_barrier_destroy(&ps_doneBarrier);
    pthread_barrier_destroy(&ps_algoBarrier);
    pthread_barrier_destroy(&ps_poolBarrier);
