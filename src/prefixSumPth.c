@@ -1,8 +1,8 @@
 #define _XOPEN_SOURCE 600
 
 // TRABALHO1: ci1316 2o semestre 2025
-// Aluno1:                            GRR:
-// Aluno2:                            GRR:
+// Aluno1: João Marcelo Caboblo       GRR: 20221227
+// Aluno2: Luíza Weigert Diapp        GRR: 20221252
 
 	///////////////////////////////////////
 	///// ATENCAO: NAO MUDAR O MAIN   /////
