@@ -193,7 +193,7 @@ void ParallelPrefixSumPth( volatile TYPE *Vec,
    pthread_barrier_init(&ps_algoBarrier, NULL, (unsigned)ps_nThreads); //Barreira depois de todas as threads fazer a soma de todos os elementos de cada uma
    pthread_barrier_init(&ps_doneBarrier, NULL, (unsigned)ps_nThreads); //Verifica que todas as barreiras terminaram 
 
-   //Barreira de atributos
+   //Váriavel de atributos
    pthread_attr_t attr; // Declara a variável de atributos
    pthread_attr_init(&attr); //Inicializa com valores padrão.
    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //Ajusta configurações específicas para não utilizar join.
